@@ -20,12 +20,49 @@ data class Show(val person: Person?): Command() {
     }
 }
 
-data class Person(val name: String, var phone: String? = null, var email: String? = null)
+data class Find(val value: String) : Command() {
+    override fun isValid(): Boolean {
+        return true
+    }
+}
+
+data class Person(val name: String, var phones: MutableList<String> = mutableListOf(), var emails: MutableList<String> = mutableListOf())
+
+class PhoneBook {
+    private val contacts: MutableMap<String, Person> = mutableMapOf()
+
+    fun addPerson(person: Person) {
+        contacts[person.name] = person
+    }
+
+    fun addPhone(name: String, phone: String) {
+        contacts[name]?.phones?.add(phone) ?: println("Person with name $name not found")
+    }
+
+    fun addEmail(name: String, email: String) {
+        contacts[name]?.emails?.add(email) ?: println("Person with name $name not found")
+    }
+
+    fun show(name: String) {
+        contacts[name]?.let { person ->
+            println("Phones for ${person.name}: ${person.phones}")
+            println("Emails for ${person.name}: ${person.emails}")
+        } ?: println("Person with name $name not found")
+    }
+
+    fun find(value: String) {
+        val foundPeople = contacts.filterValues { it.phones.contains(value) || it.emails.contains(value) }.keys
+        if (foundPeople.isNotEmpty()) {
+            println("People with ${if (value.contains('@')) "email" else "phone"} $value: $foundPeople")
+        } else {
+            println("No person found with $value")
+        }
+    }
+}
 
 fun readCommand(): Command {
-    print("Введите команду: ")
+    print("Enter command: ")
     val input = readLine()
-
     val tokens = input?.trim()?.split(" ") ?: emptyList()
     return when {
         tokens.size >= 4 && tokens[0].equals("add", ignoreCase = true) && tokens[2].equals("phone", ignoreCase = true) -> {
@@ -41,40 +78,46 @@ fun readCommand(): Command {
         tokens.size >= 1 && tokens[0].equals("show", ignoreCase = true) -> {
             Show(null)
         }
-        else -> throw IllegalArgumentException("Некорректная команда")
+        tokens.size >= 2 && tokens[0].equals("find", ignoreCase = true) -> {
+            val value = tokens[1]
+            Find(value)
+        }
+        else -> throw IllegalArgumentException("Invalid command")
     }
 }
 
 fun main() {
-    var currentPerson: Person? = null
+    val phoneBook = PhoneBook()
 
     while (true) {
         try {
             val command = readCommand()
-            println("Получена команда: $command")
+            println("Received command: $command")
+
             when (command) {
                 is AddPhone -> {
                     if (command.isValid()) {
-                        currentPerson = currentPerson ?: Person(command.name)
-                        currentPerson.phone = command.phone
+                        phoneBook.addPhone(command.name, command.phone)
                     } else {
-                        println("Ошибка: Введенный номер телефона не соответствует формату")
+                        println("Error: The entered phone number does not match the format")
                     }
                 }
                 is AddEmail -> {
                     if (command.isValid()) {
-                        currentPerson = currentPerson ?: Person(command.name)
-                        currentPerson.email = command.email
+                        phoneBook.addEmail(command.name, command.email)
                     } else {
-                        println("Ошибка: Введенный адрес электронной почты не соответствует формату")
+                        println("Error: The entered email address does not match the format")
                     }
                 }
                 is Show -> {
-                    if (currentPerson != null) {
-                        println("Последний введенный контакт: ${currentPerson.name}, ${currentPerson.phone ?: ""}, ${currentPerson.email ?: ""}")
+                    command.person?.name?.let { phoneBook.show(it) }
+                }
+                is Find -> {
+                    if (command.isValid()) {
+                        phoneBook.find(command.value)
                     } else {
-                        println("Not initialized")
-                    }
+                                println("Error: Invalid value for searching")
+                            }
                 }
             }
         } catch (e: Exception) {
